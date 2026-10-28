@@ -3,6 +3,24 @@ from typing import cast, Tuple
 import mysql.connector
 from db_config import DB_CONFIG
 
+def get_products(self):
+    """Возвращает список всех моделей товаров."""
+    conn = self.get_connection()
+    if conn is None:
+        return []
+
+    cursor = None
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM products")
+        return cursor.fetchall()
+    except mysql.connector.Error as e:
+        print(f"Ошибка БД в get_products: {e}")
+        return []
+    finally:
+        if cursor is not None:
+            cursor.close()
+        self.release_connection(conn)
 
 def calculate_price_mir_kibersporta(item_id, base_price):
     if not isinstance(item_id, int) or item_id <= 0:

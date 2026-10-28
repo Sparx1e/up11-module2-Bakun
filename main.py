@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon, QPixmap
+from database import db
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -26,6 +27,7 @@ def resource_path(*names: str) -> Path:
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.db = db
 
         self.setWindowTitle("Мир киберспорта — Каталог")
         self.resize(800, 600)
@@ -97,7 +99,10 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         self.setCentralWidget(central)
-
+    def closeEvent(self, event):
+        if self.db:
+            self.db.close_all()
+        event.accept()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
