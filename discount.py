@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import cast, Tuple
 import mysql.connector
-from venv.db_config import DB_CONFIG
+from db_config import DB_CONFIG
 
 
 def calculate_price(product_id, base_price):

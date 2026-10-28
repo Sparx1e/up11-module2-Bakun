@@ -1,7 +1,7 @@
 import PySide6
 import mysql.connector
 import PyInstaller
-from venv.db_config import DB_CONFIG
+from db_config import DB_CONFIG
 from typing import Any, cast, Tuple
 
 print("Все библиотеки работают!")
