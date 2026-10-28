@@ -1,27 +1,36 @@
 import PySide6
-import psycopg2
+import mysql.connector
 import PyInstaller
+from db_config import DB_CONFIG
+from typing import Any, cast, Tuple
+
 print("Все библиотеки работают!")
 
-def check_login(login):
-    conn = psycopg2.connect(
-        dbname="cybersport",
-        user="root",
-        password="1234",
-        host="127.0.0.1",
-        port="3306"
-    )
-    cur = conn.cursor()
-    cur.execute("SELECT role FROM users WHERE login = %s;", (login,))
-    row = cur.fetchone()
-    cur.close()
-    conn.close()
 
-    if row:
-        role = row[0]
-        return f"Вход разрешён. Роль: {role}"
-    else:
+def check_login(login):
+    conn = None
+    cur = None
+
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        cur = conn.cursor()
+
+        cur.execute("SELECT role FROM users WHERE login = %s;", (login,))
+        row = cur.fetchone()
+
+        if row is not None:
+            row_t = cast(Tuple[str], row)
+            return f"Вход разрешён. Роль: {row_t[0]}"
         return "Ошибка: неверный логин"
+
+    except mysql.connector.Error as e:
+        return f"Ошибка БД: {e}"
+    finally:
+        if cur is not None:
+            cur.close()
+        if conn is not None:
+            conn.close()
+
 
 def calculate_price(price: float, has_orders: bool) -> float:
     """
@@ -29,5 +38,9 @@ def calculate_price(price: float, has_orders: bool) -> float:
     """
     if not has_orders:
         return price * 0.75
-    else:
-        return price
+    return price
+
+
+if __name__ == "__main__":
+    print(check_login("admin"))
+    print(check_login("unknown_login"))
