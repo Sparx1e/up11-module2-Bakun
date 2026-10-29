@@ -1,93 +1,110 @@
-from decimal import Decimal
-from typing import cast, Tuple
-import mysql.connector
-from db_config import DB_CONFIG
+from pathlib import Path
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import (
+    QFrame, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
+)
 
-def get_products(self):
-    """Возвращает список всех моделей товаров."""
-    conn = self.get_connection()
-    if conn is None:
-        return []
+BASE_DIR = Path(__file__).resolve().parent
+RESOURCES = BASE_DIR / "resources"
 
-    cursor = None
-    try:
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM products")
-        return cursor.fetchall()
-    except mysql.connector.Error as e:
-        print(f"Ошибка БД в get_products: {e}")
-        return []
-    finally:
-        if cursor is not None:
-            cursor.close()
-        self.release_connection(conn)
+LOW_STOCK_THRESHOLD = 3
 
-def calculate_price_mir_kibersporta(item_id, base_price):
-    if not isinstance(item_id, int) or item_id <= 0:
-        print("Ошибка: item_id должен быть положительным целым числом")
-        return None
 
-    if not isinstance(base_price, (int, float, Decimal)):
-        print("Ошибка: base_price должен быть числом")
-        return None
+def product_image_path(product: dict) -> Path:
+    image_name = (product.get("image_path") or "").strip()
 
-    base_price = float(base_price)
+    candidates = []
 
-    if base_price <= 0:
-        print("Ошибка: цена должна быть > 0")
-        return None
+    if image_name:
+        candidates.append(RESOURCES / "Images" / image_name)
+        candidates.append(RESOURCES / image_name)
 
-    conn = None
-    cursor = None
+    candidates.append(RESOURCES / "picture.png")
 
-    try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-        cursor = conn.cursor()
+    for path in candidates:
+        if path.exists():
+            return path
 
-        sql = """
-            SELECT COUNT(*)
-            FROM order_items oi
-            JOIN orders o ON oi.order_id = o.order_id
-            WHERE oi.product_id = %s
-              AND o.order_date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)
+    return RESOURCES / "picture.png"
+
+def create_card(product: dict) -> QFrame:
+    total = int(product.get("total_quantity") or 0)
+
+    background = "#ff8080" if total <= LOW_STOCK_THRESHOLD else "#FFFFFF"
+
+    card = QFrame()
+    card.setObjectName("card")
+    card.setStyleSheet(
+        f"""
+        QFrame#card {{
+            background-color: {background};
+            border: 1px solid #CCCCCC;
+            border-radius: 8px;
+        }}
         """
+    )
+    card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed) # type: ignore
 
-        cursor.execute(sql, (item_id,))
-        result = cursor.fetchone()
+    layout = QHBoxLayout(card)
+    layout.setContentsMargins(12, 12, 12, 12)
+    layout.setSpacing(12)
 
-        if result is not None:
-            orders_count = cast(Tuple[int], result)[0]
-        else:
-            orders_count = 0
+    image_label = QLabel()
+    image_label.setFixedSize(120, 120)
+    image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        if orders_count == 0:
-            return base_price * 0.75
-        return base_price
+    pixmap = QPixmap(str(product_image_path(product)))
+    if not pixmap.isNull():
+        image_label.setPixmap(
+            pixmap.scaled(
+                120,
+                120,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        )
 
-    except mysql.connector.Error as e:
-        print(f"Ошибка БД: {e}")
-        return None
-    except Exception as e:
-        print(f"Неизвестная ошибка: {e}")
-        return None
-    finally:
-        if cursor is not None:
-            cursor.close()
-        if conn is not None:
-            conn.close()
+    layout.addWidget(image_label)
 
+    text_layout = QVBoxLayout()
+    text_layout.setSpacing(4)
 
-if __name__ == "__main__":
-    test_item_id = 1
-    test_base_price = 1490.0
+    title = QLabel(
+        f"{product.get('manufacturer', '')} | {product.get('name', '')}"
+    )
+    title.setStyleSheet("font-size: 16px; font-weight: bold;")
 
-    print("--- Тестирование функции для темы 'Мир киберспорта' ---")
-    print(f"Товар ID: {test_item_id}, Базовая цена: {test_base_price} руб.")
+    category = QLabel(str(product.get("category") or ""))
 
-    result = calculate_price_mir_kibersporta(test_item_id, test_base_price)
-
-    if result is not None:
-        discount_status = "ПРИМЕНЕНА (25%)" if result < test_base_price else "НЕ ПРИМЕНЕНА"
-        print(f"Итоговая цена: {result} руб. (Скидка: {discount_status})")
+    if total <= 0:
+        quantity_text = "Недоступно для заказа"
     else:
-        print("Программа не смогла рассчитать цену (см. ошибку выше).")
+        quantity_text = f"Доступно: {total} шт."
+
+    quantity = QLabel(quantity_text)
+
+    composition = QLabel(
+        f"Состав: {product.get('composition') or '—'}"
+    )
+    composition.setWordWrap(True)
+
+    text_layout.addWidget(title)
+    text_layout.addWidget(category)
+    text_layout.addWidget(quantity)
+    text_layout.addWidget(composition)
+    text_layout.addStretch()
+
+    layout.addLayout(text_layout, 1)
+
+    price = QLabel(
+        f"от {float(product.get('base_price') or 0):.2f} ₽"
+    )
+    price.setStyleSheet("font-size: 18px; font-weight: bold;")
+    price.setAlignment(
+        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+    )
+
+    layout.addWidget(price)
+
+    return card

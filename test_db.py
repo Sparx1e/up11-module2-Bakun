@@ -1,22 +1,21 @@
 from database import db
 
-def main():
-    conn = db.get_connection()
-    if conn is None:
-        print("Не удалось получить соединение")
-        return
 
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM products")
-        count = cursor.fetchone()[0]
-        print(f"Количество товаров: {count}")
-        cursor.close()
-    except Exception as e:
-        print(f"Ошибка запроса: {e}")
-    finally:
-        db.release_connection(conn)
-        db.close_all()
+def main():
+    products = db.get_products()
+    print(f"Количество товаров: {len(products)}")
+
+    for p in products[:3]:
+        print(
+            p["product_id"],
+            p["manufacturer"],
+            "|", p["name"],
+            "|", p["base_price"],
+            "| остаток:", p["total_quantity"],
+        )
+
+    db.close_all()
+
 
 if __name__ == "__main__":
     main()
