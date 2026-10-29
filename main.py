@@ -12,6 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent
 RESOURCES = BASE_DIR / "resources"
 
 LOW_STOCK_THRESHOLD = 3
+RESOURCES = Path(__file__).resolve().parent / "resources"
 
 
 def resource_path(*names: str) -> Path:
@@ -21,6 +22,27 @@ def resource_path(*names: str) -> Path:
             return path
     return RESOURCES / names[0]
 
+def load_product_pixmap(product: dict) -> QPixmap:
+    """
+    Возвращает QPixmap: сначала пробует image_path из БД,
+    затем — заглушку picture.png. Если и её нет — null-QPixmap.
+    """
+    image_name = (product.get("image_path") or "").strip()
+    candidates = []
+
+    if image_name:
+        candidates.append(RESOURCES / "Images" / image_name)
+        candidates.append(RESOURCES / image_name)
+
+    candidates.append(RESOURCES / "picture.png")
+
+    for path in candidates:
+        if not path.exists():
+            continue
+        pixmap = QPixmap(str(path))
+        if not pixmap.isNull():
+            return pixmap
+    return QPixmap()
 
 def product_image_path(product: dict) -> Path:
     image_name = (product.get("image_path") or "").strip()
@@ -60,6 +82,20 @@ def create_card(product: dict) -> QFrame:
     image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
     pixmap = QPixmap(str(product_image_path(product)))
+    if not pixmap.isNull():
+        image_label.setPixmap(
+            pixmap.scaled(
+                120, 120,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        )
+    layout.addWidget(image_label)
+    image_label = QLabel()
+    image_label.setFixedSize(120, 120)
+    image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+    pixmap = load_product_pixmap(product)
     if not pixmap.isNull():
         image_label.setPixmap(
             pixmap.scaled(
